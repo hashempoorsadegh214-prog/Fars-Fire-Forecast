@@ -13,6 +13,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
+    @import url('https://cdn.fontcdn.ir/Font/Persian/B-Titr/B-Titr.css');
+    @import url('https://cdn.fontcdn.ir/Font/Persian/B-Nazanin/B-Nazanin.css');
+
     :root {
       --bg-dark: #0f172a;
       --panel-bg: rgba(30, 41, 59, 0.92);
@@ -32,7 +35,7 @@
     }
 
     body {
-      font-family: Tahoma, 'Segoe UI', system-ui, sans-serif;
+      font-family: 'B Nazanin', 'B Titr', Tahoma, 'Segoe UI', system-ui, sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
       height: 100vh;
@@ -59,6 +62,7 @@
     }
 
     .header-title h1 {
+      font-family: 'B Titr', 'B Nazanin', Tahoma, sans-serif;
       font-size: 17px;
       font-weight: 700;
       color: #ff6b6b;
@@ -129,6 +133,7 @@
     }
 
     .box-title {
+      font-family: 'B Titr', 'B Nazanin', Tahoma, sans-serif;
       font-size: 12px;
       font-weight: bold;
       color: #38bdf8;
@@ -240,6 +245,23 @@
       animation: spin 0.8s linear infinite;
     }
 
+    .blinking-led {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: red;
+      box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.8);
+      margin-left: 6px;
+      vertical-align: middle;
+      animation: ledBlink 1s infinite;
+    }
+
+    @keyframes ledBlink {
+      0%, 49% { opacity: 1; background: red; box-shadow: 0 0 8px 2px rgba(255,0,0,0.8); }
+      50%, 100% { opacity: 0.15; background: #550000; box-shadow: none; }
+    }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
@@ -250,8 +272,8 @@
   <!-- هدر بالا همراه با شاخص‌های کلیدی عملکرد (KPIs) -->
   <header>
     <div class="header-title">
-      <h1>🔥 سامانه هشدار زودهنگام حریق در استان فارس</h1>
-      <span>محاسبه و نمایش بر اساس شاخص فایر ودر ایندکس</span>
+      <h1>سامانه هشدار زودهنگام حریق در استان فارس</h1>
+      <span>(FWI)</span>
     </div>
 
     <div class="kpi-container">
@@ -286,7 +308,7 @@
         <div class="box-title">🛰️ وضعیت بارگذاری مدل</div>
         <div id="statusBox" class="status-badge">در انتظار شروع...</div>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.6;">
-          <strong>تاریخ پیش‌بینی:</strong> ۲۰ سپتامبر ۲۰۲۶<br>
+          <strong>تاریخ پیش‌بینی:</strong> ۲۰ سپتامبر ۲۰۲۶ <span class="blinking-led" title="وضعیت فعال"></span><br>
           <strong>تفکیک مکانی:</strong> ۰٫۲۵° × ۰٫۳۱۲۵° (~۲۵ کیلومتر)
         </div>
       </div>
@@ -365,10 +387,8 @@
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
 
-    const esriDark = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {attribution:'&copy; Esri',maxZoom:16}).addTo(map);
-    const googleSatellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {attribution:'&copy; Google',maxZoom:20});
     const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {attribution:'&copy; Google',maxZoom:20});
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors',maxZoom:19});
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors',maxZoom:19}).addTo(map);
     const fwiOverlay = L.layerGroup().addTo(map);
     function fwiAt(lat,lng) {
       if (!tiffRaster || !tiffBbox || lng<tiffBbox[0] || lng>=tiffBbox[2] || lat<=tiffBbox[1] || lat>tiffBbox[3]) return null;
@@ -404,10 +424,10 @@
       });
       return group;
     }
-    const farsBorderLayer=vectorLayer('fars.geojson',{color:'#38bdf8',weight:2,fillOpacity:0},'#bae6fd','استان');
+    const farsBorderLayer=vectorLayer('fars.geojson',{color:'red',weight:2,fillOpacity:0},'red','استان');
     const protectedAreasLayer=vectorLayer('protected_areas.geojson',{color:'#10b981',fillColor:'#10b981',weight:2,fillOpacity:0.2},'#6ee7b7','مناطق چهارگانه محیط‌زیست');
     const huntingBannedLayer=vectorLayer('hunting_banned.geojson',{color:'#f59e0b',fillColor:'#f59e0b',weight:2,fillOpacity:0.2},'#fde68a','منطقه شکار ممنوع');
-    L.control.layers({'Esri Dark Canvas':esriDark,'Google Satellite (ماهواره گوگل)':googleSatellite,'Google Hybrid':googleHybrid,'OpenStreetMap':osm},{
+    L.control.layers({'OpenStreetMap':osm},{
       'FWI Raster (پیش‌بینی خطر حریق)':fwiOverlay,
       'مرز استان فارس':farsBorderLayer,
       'مناطق چهارگانه محیط‌زیست':protectedAreasLayer,
