@@ -121,7 +121,7 @@
       flex-direction: column;
       gap: 16px;
       z-index: 1000;
-      overflow-y: auto;
+      overflow-y: hidden;
       box-shadow: -4px 0 20px rgba(0,0,0,0.3);
     }
 
@@ -271,6 +271,42 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    body { height:100vh; height:100dvh; }
+    header { flex-shrink:0; gap:12px; padding:8px 14px; }
+    .dashboard-body { min-height:0; }
+    aside.sidebar { width:294px; flex-shrink:0; padding:8px; gap:0; min-height:0; overflow:hidden; }
+    .sidebar-content { display:flex; flex-direction:column; gap:8px; width:100%; transform-origin:top right; }
+    .sidebar .panel-box { padding:8px; flex-shrink:0; }
+    .sidebar .box-title { margin-bottom:4px; padding-bottom:3px; }
+    .sidebar .legend-item { margin:3px 0; }
+    .sidebar .gauge-panel svg { height:100px; width:176px; }
+    .sidebar .gauge-value { font-size:20px; line-height:1.2; }
+    .sidebar .gauge-risk-badge { margin:3px auto; padding:3px 8px; }
+    .sidebar .gauge-coords { padding-top:3px; }
+    .report-button, #areaReport button { font-family:'B Nazanin',Tahoma,sans-serif; cursor:pointer; border:1px solid #38bdf8; border-radius:8px; background:#075985; color:white; padding:7px 14px; font-size:15px; }
+    button:focus-visible { outline:3px solid #fbbf24; outline-offset:3px; }
+    #areaReport { margin:auto; width:min(1050px,95vw); max-height:92vh; border:1px solid #475569; border-radius:18px; background:#f8fafc; color:#172033; padding:0; font-family:'B Nazanin',Tahoma,sans-serif; box-shadow:0 25px 90px #0008; }
+    #areaReport::backdrop { background:#020617bb; backdrop-filter:blur(5px); }
+    .report-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; background:#0f172a; color:white; padding:18px 24px; }
+    .report-heading h2, .report-section h3 { font-family:'B Titr',Tahoma,sans-serif; font-size:18px; }
+    #reportContent { padding:20px 24px; line-height:1.8; }
+    .report-note { padding:12px; background:#e0f2fe; border-radius:8px; margin-bottom:16px; overflow-wrap:anywhere; }
+    .report-section { border:1px solid #cbd5e1; border-radius:12px; padding:14px; margin:14px 0; }
+    .report-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:12px 0; }
+    .report-stat { padding:10px; border-radius:8px; background:#e2e8f0; text-align:center; }
+    .report-stat strong { display:block; font-size:24px; color:#075985; }
+    .risk-summary { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+    .risk-summary span { padding:3px 9px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; }
+    .report-table-wrap { overflow-x:auto; }
+    #areaReport table { width:100%; border-collapse:collapse; font-size:15px; }
+    #areaReport th,#areaReport td { padding:8px; text-align:right; border-bottom:1px solid #cbd5e1; }
+    #areaReport th { background:#e2e8f0; }
+    .report-alert { color:#9f1239; font-weight:bold; }
+    .report-actions { display:flex; flex-wrap:wrap; gap:10px; padding:14px 24px; border-top:1px solid #cbd5e1; }
+    @media(max-width:1100px) { .kpi-container { gap:5px; } .kpi-card { min-width:80px; padding:4px 7px; } .header-title h1 { font-size:14px; } }
+    @media(max-width:760px) { header { flex-wrap:wrap; } .kpi-container { width:100%; } .kpi-card { flex:1; min-width:0; } aside.sidebar { width:260px; } .report-heading { padding:12px; } #reportContent { padding:12px; } }
+    @media print { body { display:block; height:auto; overflow:visible; background:white; } body > :not(#areaReport) { display:none!important; } #areaReport { position:static; display:block; width:100%; max-height:none; overflow:visible; border:0; box-shadow:none; margin:0; } #areaReport:not([open]) { display:none; } #areaReport::backdrop,.report-actions,#closeAreaReport { display:none!important; } .report-heading { background:white; color:black; } .report-section { break-inside:auto; } tr { break-inside:avoid; } thead { display:table-header-group; } .report-table-wrap { overflow:visible; } }
   </style>
 </head>
 <body>
@@ -282,6 +318,7 @@
       <span>بر اساس محاسبه شاخص(FWI)</span>
     </div>
 
+    <button class="report-button" id="openAreaReport" type="button">گزارش وضعیت مناطق</button>
     <div class="kpi-container">
       <div class="kpi-card">
         <span class="kpi-label">بیشینه شاخص FWI</span>
@@ -308,7 +345,7 @@
     <div id="map"></div>
 
     <!-- سایدبار کنترل و مشخصات -->
-    <aside class="sidebar">
+    <aside class="sidebar"><div class="sidebar-content">
 
       <div class="panel-box">
         <div class="box-title">🛰️ وضعیت بارگذاری مدل</div>
@@ -320,7 +357,7 @@
       </div>
 
       <div class="panel-box gauge-panel">
-        <div class="box-title">🔥 نمایشگر شاخص FWI (سرعت‌سنج)</div>
+        <div class="box-title">🔥 نمایشگر شاخص FWI</div>
         <svg width="220" height="125" viewBox="0 0 220 125">
           <defs>
             <linearGradient id="gaugeGlow" x1="0" y1="0" x2="0" y2="1">
@@ -396,7 +433,7 @@
         </div>
       </div>
 
-    </aside>
+    </div></aside>
 
     <!-- پاپ‌آپ لودینگ -->
     <div class="loader" id="loader">
@@ -406,7 +443,13 @@
 
   </div>
 
+<dialog id="areaReport" aria-labelledby="areaReportTitle" dir="rtl">
+<div class="report-heading"><div><h2 id="areaReportTitle">گزارش وضعیت مناطق</h2><p>پایش خطر حریق • استان فارس</p></div><button id="closeAreaReport" type="button" aria-label="بستن گزارش">✕</button></div>
+<div id="reportContent" aria-live="polite"></div>
+<div class="report-actions"><button id="printAreaReport" type="button">چاپ / ذخیره PDF</button><button id="downloadAreaReport" type="button">دانلود جدول CSV</button><button id="refreshAreaReport" type="button">به‌روزرسانی گزارش</button></div></dialog>
   <script>
+    const vectorLoadState = {};
+    let reportRasterSource = "";
     // راه‌اندازی نقشه
     const map = L.map('map', {
       center: [29.1, 53.2],
@@ -433,6 +476,7 @@
       return out;
     }
     function vectorLayer(url,style,bright,defaultType) {
+      vectorLoadState[url]="loading";
       const group=L.geoJSON(null,{style:()=>style,onEachFeature:(feature,layer)=>{
         layer.on('mouseover',()=>{layer.setStyle({color:bright,weight:4,opacity:1});});
         layer.on('mouseout',()=>group.resetStyle(layer));
@@ -447,9 +491,11 @@
           L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
         });
       }}).addTo(map);
-      fetch(url).then(r=>{if(!r.ok) throw new Error(url+': '+r.status);return r.json();}).then(g=>group.addData(g)).catch(err=>{
+      fetch(url).then(r=>{if(!r.ok) throw new Error(url+': '+r.status);return r.json();}).then(g=>{group.addData(g); vectorLoadState[url]="ready"; if(document.getElementById("areaReport").open) renderAreaReport();}).catch(err=>{
         console.warn(err);
-        const notice=document.createElement('div');notice.textContent='بارگذاری نشد: '+url;notice.style.color='#f59e0b';document.querySelector('aside').appendChild(notice);
+        vectorLoadState[url]='error';
+        document.getElementById('statusBox').title='بارگذاری نشد: '+url;
+        if(document.getElementById('areaReport').open) renderAreaReport();
       });
       return group;
     }
@@ -563,6 +609,8 @@
         document.getElementById('kpiMean').innerText = validCount > 0 ? (sum / validCount).toFixed(1) : '--';
         document.getElementById('kpiCritical').innerText = criticalCount + ' پیکسل';
 
+        reportRasterSource=matchedUrl;
+        if(document.getElementById('areaReport').open) renderAreaReport();
         statusBox.innerText = '✅ لایه آماده و بارگذاری شد';
         statusBox.style.background = '#065f46';
         loader.style.display = 'none';
@@ -630,5 +678,85 @@
 
     loadFwiLayer();
   </script>
+<script>
+    // Fit the complete sidebar, including short-height windows, without clipping controls.
+    function fitSidebar() {
+      const outer=document.querySelector('.sidebar'), inner=document.querySelector('.sidebar-content');
+      inner.style.transform='none'; inner.style.width='100%';
+      const available=outer.clientHeight-16, natural=inner.scrollHeight;
+      const scale=Math.min(1,Math.max(0.1,available/natural));
+      inner.style.transform=`scale(${scale})`;
+    }
+    new ResizeObserver(fitSidebar).observe(document.querySelector('.sidebar'));
+    if(document.fonts) document.fonts.ready.then(fitSidebar);
+    window.addEventListener('resize',fitSidebar); fitSidebar();
+    const reportDialog=document.getElementById('areaReport');
+    let reportRows=[];
+    const faNumber=v=>Number(v).toLocaleString('fa-IR',{maximumFractionDigits:1});
+    function riskIndex(v) { return v===null?5:v<10?0:v<20?1:v<30?2:v<45?3:4; }
+    const riskNames=['کم','متوسط','زیاد','خیلی زیاد','بحرانی','فاقد داده'];
+    function insideRing(x,y,ring) {
+      let inside=false;
+      for(let i=0,j=ring.length-1;i<ring.length;j=i++) {
+        const [xi,yi]=ring[i], [xj,yj]=ring[j];
+        if(((yi>y)!==(yj>y)) && x<(xj-xi)*(y-yi)/(yj-yi)+xi) inside=!inside;
+      }
+      return inside;
+    }
+    function areaRasterStats(geometry) {
+      const empty={max:null,samples:0,covered:0};
+      if(!tiffRaster || !tiffBbox || !geometry) return empty;
+      const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];
+      if(!polygons.length) return empty;
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      polygons.forEach(poly=>poly[0].forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}));
+      const dx=(tiffBbox[2]-tiffBbox[0])/tiffWidth,dy=(tiffBbox[3]-tiffBbox[1])/tiffHeight;
+      const x0=Math.max(0,Math.floor((minX-tiffBbox[0])/dx)), x1=Math.min(tiffWidth-1,Math.floor((maxX-tiffBbox[0])/dx));
+      const y0=Math.max(0,Math.floor((tiffBbox[3]-maxY)/dy)),y1=Math.min(tiffHeight-1,Math.floor((tiffBbox[3]-minY)/dy));
+      let max=null,samples=0,covered=0;
+      for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++) {
+        const lng=tiffBbox[0]+(x+.5)*dx,lat=tiffBbox[3]-(y+.5)*dy;
+        if(!polygons.some(poly=>insideRing(lng,lat,poly[0])&&!poly.slice(1).some(hole=>insideRing(lng,lat,hole)))) continue;
+        covered++;
+        const v=tiffRaster[y*tiffWidth+x];
+        if(Number.isFinite(v)&&v>=0&&v!==tiffNoData) {samples++;max=max===null?v:Math.max(max,v);}
+      }
+      return {max,samples,covered};
+    }
+    function renderAreaReport() {
+      reportRows=[];
+      let html=`<div class="report-note"><strong>زمان تهیه:</strong> ${escapeHtml(new Date().toLocaleString('fa-IR'))}<br><strong>منبع رستر:</strong> ${escapeHtml(reportRasterSource || 'رستر معتبر هنوز بارگذاری نشده است؛ خطر قابل ارزیابی نیست.')}<br>روش: بیشینه FWI مراکز پیکسل‌های معتبر داخل هر چندضلعی (با حذف حفره‌ها). آستانه هشدار: FWI ≥ ۲۰؛ بحرانی: FWI ≥ ۴۵. تعداد مناطق برابر تعداد عوارض فایل است. مناطق کوچک بدون مرکز پیکسل یا فاقد داده، «فاقد داده» هستند، نه کم‌خطر. پوشش ناقص ممکن است بیشینه خطر را کمتر نشان دهد.</div>`;
+      for(const [layer,url,title] of [[protectedAreasLayer,'protected_areas.geojson','مناطق چهارگانه محیط‌ زیست'],[huntingBannedLayer,'hunting_banned.geojson','مناطق شکار ممنوع']]) {
+        html+=`<section class="report-section"><h3>${title}</h3>`;
+        if(vectorLoadState[url]!=='ready') {html+=`<p>${vectorLoadState[url]==='error'?'خطا در بارگذاری مرز مناطق؛ تعداد و خطر نامشخص است.':'در انتظار بارگذاری مرز مناطق…'}</p></section>`;continue;}
+        const rows=layer.toGeoJSON().features.map(f=>{
+          const p=f.properties||{},d=descriptionFields(p.description),stats=areaRasterStats(f.geometry);
+          return {group:title,name:p.Name||p.name||p.NAME1||d.NAME1||'بدون نام',type:p.tafkik_nam||p.type||d.tafkik_nam||title,...stats};
+        }).sort((a,b)=>(b.max??-1)-(a.max??-1));
+        reportRows.push(...rows);
+        const counts=[0,0,0,0,0,0];rows.forEach(r=>counts[riskIndex(r.max)]++);
+        const alert=rows.filter(r=>r.max!==null&&r.max>=20).length;
+        html+=`<div class="report-stats"><div class="report-stat">تعداد مناطق<strong>${faNumber(rows.length)}</strong></div><div class="report-stat">مناطق هشدار<strong>${faNumber(alert)}</strong></div><div class="report-stat">فاقد داده<strong>${faNumber(counts[5])}</strong></div></div>`;
+        html+='<div class="risk-summary">'+counts.map((n,i)=>`<span>${riskNames[i]}: ${faNumber(n)}</span>`).join('')+'</div>';
+        html+=`<p>${alert?'مناطق دارای هشدار در ابتدای جدول آمده‌اند.':'در داده‌های معتبر موجود، منطقه‌ای با آستانه هشدار ثبت نشده است؛ وضعیت مناطق فاقد داده نامشخص است.'}</p>`;
+        html+='<div class="report-table-wrap"><table><thead><tr><th>نام منطقه</th><th>نوع</th><th>بیشینه FWI</th><th>طبقه خطر</th><th>پیکسل معتبر / داخل مرز</th></tr></thead><tbody>';
+        html+=rows.map(r=>`<tr class="${r.max!==null&&r.max>=20?'report-alert':''}"><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.type)}</td><td>${r.max===null?'—':faNumber(r.max)}</td><td>${riskNames[riskIndex(r.max)]}</td><td>${faNumber(r.samples)} / ${faNumber(r.covered)}</td></tr>`).join('');
+        html+='</tbody></table></div></section>';
+      }
+      document.getElementById('reportContent').innerHTML=html;
+    }
+    document.getElementById('openAreaReport').addEventListener('click',()=>{renderAreaReport();reportDialog.showModal();});
+    document.getElementById('closeAreaReport').addEventListener('click',()=>reportDialog.close());
+    reportDialog.addEventListener('close',()=>document.getElementById('openAreaReport').focus());
+    reportDialog.addEventListener('click',e=>{if(e.target===reportDialog){const r=reportDialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)reportDialog.close();}});
+    document.getElementById('refreshAreaReport').addEventListener('click',renderAreaReport);
+    document.getElementById('printAreaReport').addEventListener('click',()=>window.print());
+    document.getElementById('downloadAreaReport').addEventListener('click',()=>{
+      const safe=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';
+      const rows=[['گروه','نام منطقه','نوع','بیشینه FWI','طبقه خطر','پیکسل معتبر','پیکسل داخل مرز','منبع رستر'],...reportRows.map(r=>[r.group,r.name,r.type,r.max,riskNames[riskIndex(r.max)],r.samples,r.covered,reportRasterSource||'فاقد رستر'])];
+      const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='area-status-report.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
+</script>
 </body>
 </html>
