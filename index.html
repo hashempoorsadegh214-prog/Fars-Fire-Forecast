@@ -1,1 +1,504 @@
 
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>داشبورد پایش سامانه هشدار حریق استان فارس (NASA GEOS-5 FWI)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- GeoTIFF.js -->
+  <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.92);
+      --panel-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --critical: #880e4f;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Tahoma, 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* نوار بالایی هدر و کارت‌های آماری */
+    header {
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1100;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    .header-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-title h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #ff6b6b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title span {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .kpi-container {
+      display: flex;
+      gap: 14px;
+    }
+
+    .kpi-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 6px 14px;
+      text-align: center;
+      min-width: 115px;
+    }
+
+    .kpi-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .kpi-value {
+      font-size: 17px;
+      font-weight: bold;
+      color: #38bdf8;
+    }
+
+    /* بدنه اصلی داشبورد */
+    .dashboard-body {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* سایدبار کنترل‌ها و لژاند */
+    aside.sidebar {
+      width: 320px;
+      background: var(--panel-bg);
+      border-left: 1px solid var(--panel-border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 1000;
+      overflow-y: auto;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    }
+
+    .panel-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .box-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 4px;
+    }
+
+    .status-badge {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      background: #334155;
+      color: #e2e8f0;
+      text-align: center;
+    }
+
+    /* لژاند شاخص FWI */
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 5px 0;
+      font-size: 12px;
+    }
+
+    .legend-color-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-color-box {
+      width: 20px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .legend-range {
+      font-size: 11px;
+      color: var(--text-muted);
+      direction: ltr;
+    }
+
+    /* محیط نقشه */
+    #map {
+      flex: 1;
+      height: 100%;
+      background: #090d16;
+    }
+
+    /* کارت اطلاعات پیکسلی شناور روی نقشه */
+    .pixel-inspector {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      min-width: 240px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+    }
+
+    .inspector-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .inspector-val {
+      font-size: 20px;
+      font-weight: bold;
+      color: #ff6b6b;
+      margin-bottom: 4px;
+    }
+
+    /* پاپ‌آپ لودینگ */
+    .loader {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #38bdf8;
+      border-radius: 12px;
+      padding: 20px 30px;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- هدر بالا همراه با شاخص‌های کلیدی عملکرد (KPIs) -->
+  <header>
+    <div class="header-title">
+      <h1>🔥 سامانه پایش و هشدار حریق استان فارس (FWI)</h1>
+      <span>داده‌های پیش‌بینی اقلیمی ناسا (NASA GEOS-5 CFFDRS)</span>
+    </div>
+
+    <div class="kpi-container">
+      <div class="kpi-card">
+        <span class="kpi-label">بیشینه شاخص FWI</span>
+        <span class="kpi-value" id="kpiMax">--</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">میانگین شاخص استان</span>
+        <span class="kpi-value" id="kpiMean">--</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">پیکسل‌های بحرانی</span>
+        <span class="kpi-value" style="color: #f43f5e;" id="kpiCritical">--</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">وضعیت ارتباط سامانه</span>
+        <span class="kpi-value" style="color: #10b981; font-size: 13px; line-height: 24px;">فعال و برخط</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="dashboard-body">
+
+    <!-- نقشه Leaflet -->
+    <div id="map"></div>
+
+    <!-- سایدبار کنترل و مشخصات -->
+    <aside class="sidebar">
+
+      <div class="panel-box">
+        <div class="box-title">🛰️ وضعیت بارگذاری مدل</div>
+        <div id="statusBox" class="status-badge">در انتظار شروع...</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.6;">
+          <strong>تاریخ پیش‌بینی:</strong> ۲۰ سپتامبر ۲۰۲۶<br>
+          <strong>تفکیک مکانی:</strong> ۰٫۲۵° × ۰٫۳۱۲۵° (~۲۵ کیلومتر)
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <div class="box-title">📊 راهنمای طبقات خطر (FWI)</div>
+
+        <div class="legend-item">
+          <div class="legend-color-label">
+            <span class="legend-color-box" style="background:#2e7d32;"></span>
+            <span>خطر کم (Low)</span>
+          </div>
+          <span class="legend-range">&lt; 10</span>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color-label">
+            <span class="legend-color-box" style="background:#f9d835;"></span>
+            <span>خطر متوسط (Moderate)</span>
+          </div>
+          <span class="legend-range">10 - 20</span>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color-label">
+            <span class="legend-color-box" style="background:#fb8c00;"></span>
+            <span>خطر زیاد (High)</span>
+          </div>
+          <span class="legend-range">20 - 30</span>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color-label">
+            <span class="legend-color-box" style="background:#d32f2f;"></span>
+            <span>خطر خیلی زیاد (Very High)</span>
+          </div>
+          <span class="legend-range">30 - 45</span>
+        </div>
+
+        <div class="legend-item">
+          <div class="legend-color-label">
+            <span class="legend-color-box" style="background:#880e4f;"></span>
+            <span>خطر فوق‌بحرانی (Extreme)</span>
+          </div>
+          <span class="legend-range">&gt; 45</span>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- کارت اطلاعات پیکسلی شناور روی نقشه -->
+    <div class="pixel-inspector">
+      <div class="inspector-title">
+        <span>موقعیت مکانی موس</span>
+        <span id="coordVal" style="direction:ltr; font-family: monospace;">-- , --</span>
+      </div>
+      <div class="inspector-val" id="hoverFwiVal">--</div>
+      <div style="font-size: 11px; color: var(--text-muted);" id="hoverRiskLevel">روی نقشه استان حرکت کنید</div>
+    </div>
+
+    <!-- پاپ‌آپ لودینگ -->
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <span>در حال دریافت و رندر لایه‌های رستری FWI استان فارس...</span>
+    </div>
+
+  </div>
+
+  <script>
+    // راه‌اندازی نقشه
+    const map = L.map('map', {
+      center: [29.1, 53.2],
+      zoom: 7,
+      zoomControl: false
+    });
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    // نقشه پایه Dark
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; CartoDB & NASA GEOS-5',
+      maxZoom: 19
+    }).addTo(map);
+
+    let tiffRaster = null;
+    let tiffBbox = null;
+    let tiffWidth = 0;
+    let tiffHeight = 0;
+
+    function getFwiColor(val) {
+      if (val === null || isNaN(val) || val < 0) return [0, 0, 0, 0];
+      if (val < 10) return [46, 125, 50, 180];     // سبز
+      if (val < 20) return [249, 216, 53, 190];   // زرد
+      if (val < 30) return [251, 140, 0, 200];    // نارنجی
+      if (val < 45) return [211, 47, 47, 210];    // قرمز
+      return [136, 14, 79, 230];                  // زرشکی بحرانی
+    }
+
+    function getRiskLabel(val) {
+      if (val === null || isNaN(val) || val < 0) return 'خارج از محدوده';
+      if (val < 10) return 'خطر کم (Low)';
+      if (val < 20) return 'خطر متوسط (Moderate)';
+      if (val < 30) return 'خطر زیاد (High)';
+      if (val < 45) return 'خطر خیلی زیاد (Very High)';
+      return 'خطر بحرانی (Extreme)';
+    }
+
+    async function loadFwiLayer() {
+      const statusBox = document.getElementById('statusBox');
+      const loader = document.getElementById('loader');
+      const tifUrl = 'data/clipped/FWI_20260920_fars.tif';
+
+      try {
+        statusBox.innerText = 'در حال دریافت فایل رستر...';
+        const response = await fetch(tifUrl);
+        if (!response.ok) throw new Error('فایل رستر یافت نشد.');
+
+        const arrayBuffer = await response.arrayBuffer();
+        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+        const image = await tiff.getImage();
+
+        tiffWidth = image.getWidth();
+        tiffHeight = image.getHeight();
+        const rasters = await image.readRasters();
+        tiffRaster = rasters[0];
+        tiffBbox = image.getBoundingBox(); // [minX, minY, maxX, maxY]
+
+        const bounds = [
+          [tiffBbox[1], tiffBbox[0]],
+          [tiffBbox[3], tiffBbox[2]]
+        ];
+
+        // تولید بوم Canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = tiffWidth;
+        canvas.height = tiffHeight;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(tiffWidth, tiffHeight);
+
+        let maxVal = -Infinity;
+        let sum = 0;
+        let validCount = 0;
+        let criticalCount = 0;
+
+        for (let i = 0; i < tiffRaster.length; i++) {
+          const val = tiffRaster[i];
+          const color = getFwiColor(val);
+          const idx = i * 4;
+
+          imgData.data[idx] = color[0];
+          imgData.data[idx + 1] = color[1];
+          imgData.data[idx + 2] = color[2];
+          imgData.data[idx + 3] = color[3];
+
+          if (val > 0 && val < 200) {
+            if (val > maxVal) maxVal = val;
+            sum += val;
+            validCount++;
+            if (val >= 30) criticalCount++;
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+
+        // افزودن لایه به نقشه
+        L.imageOverlay(canvas.toDataURL(), bounds, { opacity: 0.85 }).addTo(map);
+        map.fitBounds(bounds);
+
+        // بروزرسانی آمار بالا
+        document.getElementById('kpiMax').innerText = maxVal > -Infinity ? maxVal.toFixed(1) : '--';
+        document.getElementById('kpiMean').innerText = validCount > 0 ? (sum / validCount).toFixed(1) : '--';
+        document.getElementById('kpiCritical').innerText = criticalCount + ' پیکسل';
+
+        statusBox.innerText = '✅ لایه آماده و بارگذاری شد';
+        statusBox.style.background = '#065f46';
+        loader.style.display = 'none';
+
+      } catch (err) {
+        console.error(err);
+        statusBox.innerText = '❌ خطا در لود داده TIF';
+        statusBox.style.background = '#881337';
+        loader.style.display = 'none';
+      }
+    }
+
+    // بازرسی مقدار پیکسلی با حرکت موس
+    map.on('mousemove', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      document.getElementById('coordVal').innerText = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+
+      if (!tiffRaster || !tiffBbox) return;
+
+      if (lng >= tiffBbox[0] && lng <= tiffBbox[2] && lat >= tiffBbox[1] && lat <= tiffBbox[3]) {
+        const xPct = (lng - tiffBbox[0]) / (tiffBbox[2] - tiffBbox[0]);
+        const yPct = (tiffBbox[3] - lat) / (tiffBbox[3] - tiffBbox[1]);
+
+        const px = Math.floor(xPct * tiffWidth);
+        const py = Math.floor(yPct * tiffHeight);
+        const val = tiffRaster[py * tiffWidth + px];
+
+        if (val !== undefined && val > 0 && val < 200) {
+          document.getElementById('hoverFwiVal').innerText = `FWI: ${val.toFixed(1)}`;
+          document.getElementById('hoverRiskLevel').innerText = getRiskLabel(val);
+          return;
+        }
+      }
+      document.getElementById('hoverFwiVal').innerText = '--';
+      document.getElementById('hoverRiskLevel').innerText = 'خارج از محدوده آتش';
+    });
+
+    loadFwiLayer();
+  </script>
+</body>
+</html>
