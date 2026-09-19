@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -366,9 +365,10 @@
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
     // نقشه پایه Dark
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; CartoDB & NASA GEOS-5',
-      maxZoom: 19
+    // Dark basemap (no API key)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; Esri, DeLorme, NAVTEQ & NASA GEOS-5',
+      maxZoom: 16
     }).addTo(map);
 
     let tiffRaster = null;
@@ -397,12 +397,22 @@
     async function loadFwiLayer() {
       const statusBox = document.getElementById('statusBox');
       const loader = document.getElementById('loader');
-      const tifUrl = 'data/clipped/FWI_20260920_fars.tif';
-
       try {
         statusBox.innerText = 'در حال دریافت فایل رستر...';
-        const response = await fetch(tifUrl);
-        if (!response.ok) throw new Error('فایل رستر یافت نشد.');
+        const candidateUrls = [
+          'data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif',
+          'data/clipped/FWI_20260920_fars.tif',
+          'data/processed/fwi/FWI_GEOS5_Fars_latest.tif'
+        ];
+        let response = null;
+        let matchedUrl = '';
+        for (const url of candidateUrls) {
+          try {
+            const res = await fetch(url);
+            if (res.ok) { response = res; matchedUrl = url; break; }
+          } catch(e) {}
+        }
+        if (!response) throw new Error('فایل رستر TIF در مسیرهای تعریف‌شده یافت نشد.');
 
         const arrayBuffer = await response.arrayBuffer();
         const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
