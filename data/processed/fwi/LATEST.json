@@ -1,0 +1,7 @@
+{
+  "date": "2026-09-20",
+  "netcdf": "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc",
+  "forecast_run": "2026091700",
+  "source_url": "https://portal.nccs.nasa.gov/datashare/GlobalFWI/v2.0/fwiCalcs.GEOS-5/Default/GEOS-5/2026/2026091700/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc",
+  "tif": "data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
+}
