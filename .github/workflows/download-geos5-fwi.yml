@@ -1,0 +1,243 @@
+name: Download NASA GEOS-5 FWI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: "Target date (YYYY-MM-DD)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  download-geos5-fwi:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ------------------------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      # ------------------------------------------------------------
+      # 2. Setup Python
+      # ------------------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ------------------------------------------------------------
+      # 3. Install dependencies
+      # ------------------------------------------------------------
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      # ------------------------------------------------------------
+      # 4. Verify Fars boundary
+      # ------------------------------------------------------------
+      - name: Verify Fars boundary
+        run: |
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "VERIFYING FARS BOUNDARY"
+          echo "=============================================="
+
+          test -f fars.geojson
+          test -s fars.geojson
+
+          echo
+          echo "Fars boundary found:"
+          ls -lh fars.geojson
+
+      # ------------------------------------------------------------
+      # 5. Determine target date
+      # ------------------------------------------------------------
+      - name: Determine target date
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${{ github.event.inputs.target_date }}" ]; then
+            TARGET_DATE="${{ github.event.inputs.target_date }}"
+          else
+            TARGET_DATE="$(TZ=Asia/Tehran date -d 'tomorrow' '+%Y-%m-%d')"
+          fi
+
+          if ! [[ "$TARGET_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "ERROR: Invalid target date."
+            echo "TARGET_DATE=$TARGET_DATE"
+            exit 1
+          fi
+
+          echo "TARGET_DATE=$TARGET_DATE" >> "$GITHUB_OUTPUT"
+
+          echo
+          echo "=============================================="
+          echo "TARGET DATE"
+          echo "=============================================="
+          echo
+          echo "Target date: $TARGET_DATE"
+
+      # ------------------------------------------------------------
+      # 6. Download exact NASA GEOS-5 forecast
+      # ------------------------------------------------------------
+      - name: Download NASA GEOS-5 FWI
+        env:
+          TARGET_DATE: ${{ steps.target.outputs.TARGET_DATE }}
+        run: |
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "NASA GEOS-5 FWI DOWNLOAD"
+          echo "=============================================="
+
+          echo
+          echo "TARGET_DATE=$TARGET_DATE"
+
+          python scripts/download_geos5_fwi.py
+
+      # ------------------------------------------------------------
+      # 7. Verify downloaded NetCDF
+      # ------------------------------------------------------------
+      - name: Verify downloaded NetCDF
+        env:
+          TARGET_DATE: ${{ steps.target.outputs.TARGET_DATE }}
+        run: |
+          set -euo pipefail
+
+          TARGET_COMPACT="${TARGET_DATE//-/}"
+
+          echo "=============================================="
+          echo "VERIFYING DOWNLOADED NASA FILE"
+          echo "=============================================="
+
+          FILE=""
+
+          for f in data/raw/fwi/*.nc; do
+            if [[ "$f" == *".$TARGET_COMPACT.nc" ]]; then
+              FILE="$f"
+              break
+            fi
+          done
+
+          if [ -z "$FILE" ]; then
+            echo
+            echo "ERROR: Target NetCDF was not found."
+            echo
+            echo "Expected date:"
+            echo "$TARGET_DATE"
+            echo
+            echo "Available files:"
+            find data/raw/fwi -maxdepth 1 -type f -name "*.nc" -print || true
+            exit 1
+          fi
+
+          test -s "$FILE"
+
+          echo
+          echo "TARGET NETCDF FOUND"
+          echo
+          echo "File:"
+          echo "$FILE"
+          echo
+          echo "Size:"
+          ls -lh "$FILE"
+
+      # ------------------------------------------------------------
+      # 8. Show git status
+      # ------------------------------------------------------------
+      - name: Show git status
+        run: |
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "GIT STATUS"
+          echo "=============================================="
+
+          git status --short
+
+      # ------------------------------------------------------------
+      # 9. Commit downloaded file
+      # ------------------------------------------------------------
+      - name: Commit downloaded FWI
+        env:
+          TARGET_DATE: ${{ steps.target.outputs.TARGET_DATE }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/raw/fwi/
+
+          if git diff --cached --quiet; then
+            echo
+            echo "No new FWI file to commit."
+            exit 0
+          fi
+
+          git commit -m "Download NASA GEOS-5 FWI ${TARGET_DATE}"
+
+      # ------------------------------------------------------------
+      # 10. Push to GitHub
+      # ------------------------------------------------------------
+      - name: Push to GitHub
+        run: |
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "PUSHING TO GITHUB"
+          echo "=============================================="
+
+          git push origin HEAD:main
+
+      # ------------------------------------------------------------
+      # 11. Final verification
+      # ------------------------------------------------------------
+      - name: Final verification
+        env:
+          TARGET_DATE: ${{ steps.target.outputs.TARGET_DATE }}
+        run: |
+          set -euo pipefail
+
+          TARGET_COMPACT="${TARGET_DATE//-/}"
+
+          echo
+          echo "=============================================="
+          echo "DOWNLOAD COMPLETE"
+          echo "=============================================="
+
+          echo
+          echo "Target date:"
+          echo "$TARGET_DATE"
+
+          echo
+          echo "NASA source:"
+          echo "https://portal.nccs.nasa.gov/datashare/GlobalFWI/v2.0/fwiCalcs.GEOS-5/Default/GEOS-5/"
+
+          echo
+          echo "Downloaded file:"
+          find data/raw/fwi -maxdepth 1 -type f \
+            -name "*.${TARGET_COMPACT}.nc" \
+            -print
+
+          echo
+          echo "Git commit:"
+          git log -1 --oneline
+
+          echo
+          echo "=============================================="
+          echo "SUCCESS"
+          echo "=============================================="
