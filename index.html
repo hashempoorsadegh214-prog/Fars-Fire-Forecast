@@ -188,35 +188,41 @@
       background: #090d16;
     }
 
-    /* کارت اطلاعات پیکسلی شناور روی نقشه */
-    .pixel-inspector {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      z-index: 1000;
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      padding: 12px 18px;
-      min-width: 240px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      backdrop-filter: blur(8px);
+    /* پنل گیج شاخص FWI در سایدبار */
+    .gauge-panel svg { display: block; margin: 0 auto; }
+    .gauge-needle {
+      transform-origin: 110px 100px;
+      transition: transform 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
     }
-
-    .inspector-title {
+    .gauge-value {
+      font-family: 'B Titr', 'B Nazanin', Tahoma, sans-serif;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      color: #38bdf8;
+      direction: ltr;
+    }
+    .gauge-risk-badge {
+      display: block;
+      margin: 6px auto 8px auto;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #334155;
+      color: #e2e8f0;
+      text-align: center;
+      transition: background 0.3s, color 0.3s;
+    }
+    .gauge-coords {
+      font-family: monospace;
       font-size: 12px;
       color: var(--text-muted);
-      margin-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
+      text-align: center;
+      direction: ltr;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 6px;
     }
-
-    .inspector-val {
-      font-size: 20px;
-      font-weight: bold;
-      color: #ff6b6b;
-      margin-bottom: 4px;
-    }
+    .gauge-coords-label { font-family: 'B Nazanin', Tahoma, sans-serif; direction: rtl; font-size: 11px; display: block; margin-bottom: 2px; }
 
     /* پاپ‌آپ لودینگ */
     .loader {
@@ -313,6 +319,39 @@
         </div>
       </div>
 
+      <div class="panel-box gauge-panel">
+        <div class="box-title">🔥 نمایشگر شاخص FWI (سرعت‌سنج)</div>
+        <svg width="220" height="125" viewBox="0 0 220 125">
+          <defs>
+            <linearGradient id="gaugeGlow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(56,189,248,0.15)"/>
+              <stop offset="100%" stop-color="rgba(56,189,248,0)"/>
+            </linearGradient>
+          </defs>
+          <!-- زون‌های نیم‌دایره: Low, Moderate, High, Very High, Extreme -->
+          <path d="M 22 100 A 88 88 0 0 1 50 34" stroke="#2e7d32" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <path d="M 58 27 A 88 88 0 0 1 102 12" stroke="#f9d835" stroke-width="14" fill="none"/>
+          <path d="M 118 12 A 88 88 0 0 1 162 27" stroke="#fb8c00" stroke-width="14" fill="none"/>
+          <path d="M 170 34 A 88 88 0 0 1 196 68" stroke="#d32f2f" stroke-width="14" fill="none"/>
+          <path d="M 198 76 A 88 88 0 0 1 198 100" stroke="#880e4f" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <text x="14" y="120" fill="#94a3b8" font-size="9" font-family="monospace">0</text>
+          <text x="192" y="120" fill="#94a3b8" font-size="9" font-family="monospace">60</text>
+          <ellipse cx="110" cy="100" rx="80" ry="66" fill="url(#gaugeGlow)"/>
+          <!-- عقربه -->
+          <g id="gaugeNeedle" class="gauge-needle" style="transform: rotate(-90deg);">
+            <line x1="110" y1="100" x2="110" y2="30" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>
+            <polygon points="110,20 105,33 115,33" fill="#ff6b6b"/>
+          </g>
+          <circle cx="110" cy="100" r="7" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        </svg>
+        <div class="gauge-value" id="gaugeFwiVal">--</div>
+        <span class="gauge-risk-badge" id="gaugeRiskBadge">داده‌ای موجود نیست</span>
+        <div class="gauge-coords">
+          <span class="gauge-coords-label">📍 موقعیت مکانی موس</span>
+          <span id="coordVal">-- , --</span>
+        </div>
+      </div>
+
       <div class="panel-box">
         <div class="box-title">📊 راهنمای طبقات خطر (FWI)</div>
 
@@ -358,16 +397,6 @@
       </div>
 
     </aside>
-
-    <!-- کارت اطلاعات پیکسلی شناور روی نقشه -->
-    <div class="pixel-inspector">
-      <div class="inspector-title">
-        <span>موقعیت مکانی موس</span>
-        <span id="coordVal" style="direction:ltr; font-family: monospace;">-- , --</span>
-      </div>
-      <div class="inspector-val" id="hoverFwiVal">--</div>
-      <div style="font-size: 11px; color: var(--text-muted);" id="hoverRiskLevel">روی نقشه استان حرکت کنید</div>
-    </div>
 
     <!-- پاپ‌آپ لودینگ -->
     <div class="loader" id="loader">
@@ -546,16 +575,58 @@
       }
     }
 
-    // بازرسی مقدار پیکسلی با حرکت موس
-    map.on('mousemove', function(e) {
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
-      document.getElementById('coordVal').innerText = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    // بازرسی مقدار پیکسلی با حرکت موس + به‌روزرسانی گیج FWI
+    const MAX_FWI = 60;
+    let needleAngle = -90;
+    let targetAngle = -90;
+    (function animateNeedle() {
+      needleAngle += (targetAngle - needleAngle) * 0.15;
+      const g = document.getElementById('gaugeNeedle');
+      if (g) g.style.transform = 'rotate(' + needleAngle.toFixed(2) + 'deg)';
+      requestAnimationFrame(animateNeedle);
+    })();
 
-      const val=fwiAt(lat,lng);
-      document.getElementById('hoverFwiVal').innerText=val===null?'--':`FWI: ${val.toFixed(1)}`;
-      document.getElementById('hoverRiskLevel').innerText=val===null?'داده‌ای موجود نیست':getRiskLabel(val);
-    });
+    const RISK_STYLES = {
+      low:     { label: 'خطر کم (Low)',              color: '#2e7d32', dark: false },
+      mod:     { label: 'خطر متوسط (Moderate)',      color: '#f9d835', dark: true  },
+      high:    { label: 'خطر زیاد (High)',           color: '#fb8c00', dark: false },
+      vhigh:   { label: 'خطر خیلی زیاد (Very High)', color: '#d32f2f', dark: false },
+      extreme: { label: 'خطر فوق‌بحرانی (Extreme)',   color: '#880e4f', dark: false }
+    };
+    function riskKey(v) {
+      if (v < 10) return 'low';
+      if (v < 20) return 'mod';
+      if (v < 30) return 'high';
+      if (v < 45) return 'vhigh';
+      return 'extreme';
+    }
+
+    function setGaugeNoData() {
+      targetAngle = -90;
+      document.getElementById('gaugeFwiVal').innerText = '--';
+      const badge = document.getElementById('gaugeRiskBadge');
+      badge.textContent = 'داده‌ای موجود نیست';
+      badge.style.background = '#334155';
+      badge.style.color = '#e2e8f0';
+    }
+
+    function updateGauge(lat, lng) {
+      document.getElementById('coordVal').innerText = lat.toFixed(3) + ', ' + lng.toFixed(3);
+      const val = fwiAt(lat, lng);
+      const valEl = document.getElementById('gaugeFwiVal');
+      const badge = document.getElementById('gaugeRiskBadge');
+      if (val === null) { setGaugeNoData(); return; }
+      targetAngle = -90 + Math.min(val, MAX_FWI) / MAX_FWI * 180;
+      valEl.innerText = 'FWI: ' + val.toFixed(1);
+      const rk = RISK_STYLES[riskKey(val)];
+      valEl.style.color = rk.color;
+      badge.textContent = rk.label;
+      badge.style.background = rk.color;
+      badge.style.color = rk.dark ? '#111827' : '#ffffff';
+    }
+
+    map.on('mousemove', function(e) { updateGauge(e.latlng.lat, e.latlng.lng); });
+    map.on('mouseout', setGaugeNoData);
 
     loadFwiLayer();
   </script>
