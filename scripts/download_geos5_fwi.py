@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 FARS-GEOS5-FWI
@@ -35,6 +34,8 @@ from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from urllib.parse import urljoin
 import os
+import json
+from zoneinfo import ZoneInfo
 import re
 import sys
 
@@ -157,7 +158,7 @@ def get_target_date():
     # Default = tomorrow
     # --------------------------------------------------------
 
-    return datetime.utcnow().date() + timedelta(days=1)
+    return datetime.now(ZoneInfo("Asia/Tehran")).date() + timedelta(days=1)
 
 
 # ============================================================
@@ -219,6 +220,9 @@ def get_directory_links(url):
     print(url)
 
     response = get_url(url)
+    if response.status_code == 404:
+        response.close()
+        return []
 
     print(
         f"HTTP STATUS: {response.status_code}"
@@ -356,23 +360,6 @@ def find_forecast_runs(year):
         f"Forecast runs found: "
         f"{len(forecast_runs)}"
     )
-
-    if not forecast_runs:
-
-        print()
-        print(
-            "ERROR: No GEOS-5 forecast runs were found."
-        )
-
-        sys.exit(1)
-
-    print()
-
-    for run_name, run_url in forecast_runs:
-
-        print(
-            f"  {run_name}"
-        )
 
     return forecast_runs
 
@@ -781,9 +768,11 @@ def main():
     # Find forecast runs
     # --------------------------------------------------------
 
-    forecast_runs = find_forecast_runs(
-        target_date.year
-    )
+    forecast_runs = []
+    for year in sorted({target_date.year, (target_date - timedelta(days=10)).year}, reverse=True):
+        forecast_runs.extend(find_forecast_runs(year))
+    forecast_runs = sorted((r for r in forecast_runs if
+        target_date - timedelta(days=10) <= datetime.strptime(r[0], "%Y%m%d%H").date() <= target_date), reverse=True)[:20]
 
     # --------------------------------------------------------
     # Find exact forecast file
@@ -843,41 +832,15 @@ def main():
     # Avoid duplicate download
     # --------------------------------------------------------
 
-    if output_path.exists():
-
-        size = output_path.stat().st_size
-
-        if size > 0:
-
-            print()
-            print("=" * 80)
-            print("FILE ALREADY EXISTS")
-            print("=" * 80)
-
-            print()
-            print(
-                f"File: {output_path}"
-            )
-
-            print(
-                f"Size: {size:,} bytes"
-            )
-
-            print()
-            print(
-                "Download skipped."
-            )
-
-            return
-
-    # --------------------------------------------------------
-    # Download
-    # --------------------------------------------------------
-
-    download_file(
-        nasa_url,
-        output_path
-    )
+    download_file(nasa_url, output_path)
+    from netCDF4 import Dataset
+    with Dataset(output_path) as nc:
+        if "GEOS-5_FWI" not in nc.variables:
+            raise ValueError("Downloaded file has no GEOS-5_FWI variable")
+    (OUTPUT_DIR / "LATEST.json").write_text(json.dumps({
+        "date": target_date.isoformat(), "netcdf": output_path.as_posix(),
+        "forecast_run": forecast_run, "source_url": nasa_url
+    }, indent=2) + "\n")
 
     # --------------------------------------------------------
     # Final verification
