@@ -1,160 +1,62 @@
-name: Build GEOS-5 FWI Clipped TIFF
-
+name: Automatic GEOS-5 FWI
 on:
+  schedule:
+    - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
-
+    inputs:
+      target_date:
+        description: 'Optional YYYY-MM-DD; blank = tomorrow in Tehran'
+        required: false
+        default: ''
 permissions:
   contents: write
-
+  pages: write
+  id-token: write
+concurrency:
+  group: geos5-publish
+  cancel-in-progress: false
 jobs:
-  build-fwi-tif:
+  update:
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
-
-      # ------------------------------------------------------
-      # Checkout repository
-      # ------------------------------------------------------
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          fetch-depth: 0
-
-      # ------------------------------------------------------
-      # Python
-      # ------------------------------------------------------
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # ------------------------------------------------------
-      # Install dependencies
-      # ------------------------------------------------------
-
+          python-version: '3.11'
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-
-          pip install \
-            numpy \
-            netCDF4 \
-            rasterio \
-            geopandas \
-            shapely \
-            pyproj
-
-      # ------------------------------------------------------
-      # Verify inputs
-      # ------------------------------------------------------
-
-      - name: Verify input files
+        run: pip install requests numpy netCDF4 rasterio geopandas shapely pyproj
+      - name: Download exact forecast and build validated raster
+        env:
+          TARGET_DATE: ${{ inputs.target_date }}
         run: |
           set -euo pipefail
-
-          echo "Checking NetCDF..."
-
-          test -f \
-            "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc"
-
-          echo "Checking Fars boundary..."
-
-          test -f "fars.geojson"
-
-          echo
-          echo "Input files:"
-          ls -lh \
-            "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc"
-
-          ls -lh "fars.geojson"
-
-      # ------------------------------------------------------
-      # Build clipped TIFF
-      # ------------------------------------------------------
-
-      - name: Build clipped FWI GeoTIFF
-        run: |
-          set -euo pipefail
-
+          test -s fars.geojson
+          python scripts/download_geos5_fwi.py
           python scripts/clip_geos5_fwi.py
-
-      # ------------------------------------------------------
-      # Verify output
-      # ------------------------------------------------------
-
-      - name: Verify output TIFF
+      - name: Commit only published data
         run: |
           set -euo pipefail
-
-          OUTPUT="data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
-
-          test -f "$OUTPUT"
-
-          echo
-          echo "Output TIFF:"
-          ls -lh "$OUTPUT"
-
-          python - <<'PY'
-          import rasterio
-
-          path = "data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
-
-          with rasterio.open(path) as src:
-              print("CRS      :", src.crs)
-              print("Width    :", src.width)
-              print("Height   :", src.height)
-              print("Bounds   :", src.bounds)
-              print("NoData   :", src.nodata)
-              print("Transform:", src.transform)
-
-              assert src.crs.to_string() == "EPSG:4326"
-              assert src.count == 1
-              assert src.width > 0
-              assert src.height > 0
-
-          print("TIFF verification: OK")
-          PY
-
-      # ------------------------------------------------------
-      # Commit result
-      # ------------------------------------------------------
-
-      - name: Commit TIFF
-        run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/processed/fwi/
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update GEOS-5 forecast and metadata'
+            git push
           fi
-
-          git commit -m "Build clipped GEOS-5 FWI TIFF for 2026-09-20"
-
-          git push origin HEAD:main
-
-      # ------------------------------------------------------
-      # Final verification
-      # ------------------------------------------------------
-
-      - name: Final verification
+      - uses: actions/configure-pages@v5
+      - name: Prepare website without raw NetCDF
         run: |
-          set -euo pipefail
-
-          echo
-          echo "=================================================="
-          echo "GEOS-5 FWI TIFF BUILD COMPLETED"
-          echo "=================================================="
-          echo
-
-          git status --short
-
-          ls -lh \
-            "data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
+          mkdir _site
+          git archive HEAD | tar -x -C _site
+          rm -rf _site/.github _site/scripts _site/data/raw
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deploy
