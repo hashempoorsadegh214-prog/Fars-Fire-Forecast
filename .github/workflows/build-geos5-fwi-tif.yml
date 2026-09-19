@@ -1,0 +1,160 @@
+name: Build GEOS-5 FWI Clipped TIFF
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-fwi-tif:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ------------------------------------------------------
+      # Checkout repository
+      # ------------------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ------------------------------------------------------
+      # Python
+      # ------------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # ------------------------------------------------------
+      # Install dependencies
+      # ------------------------------------------------------
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          pip install \
+            numpy \
+            netCDF4 \
+            rasterio \
+            geopandas \
+            shapely \
+            pyproj
+
+      # ------------------------------------------------------
+      # Verify inputs
+      # ------------------------------------------------------
+
+      - name: Verify input files
+        run: |
+          set -euo pipefail
+
+          echo "Checking NetCDF..."
+
+          test -f \
+            "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc"
+
+          echo "Checking Fars boundary..."
+
+          test -f "fars.geojson"
+
+          echo
+          echo "Input files:"
+          ls -lh \
+            "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc"
+
+          ls -lh "fars.geojson"
+
+      # ------------------------------------------------------
+      # Build clipped TIFF
+      # ------------------------------------------------------
+
+      - name: Build clipped FWI GeoTIFF
+        run: |
+          set -euo pipefail
+
+          python scripts/clip_geos5_fwi.py
+
+      # ------------------------------------------------------
+      # Verify output
+      # ------------------------------------------------------
+
+      - name: Verify output TIFF
+        run: |
+          set -euo pipefail
+
+          OUTPUT="data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
+
+          test -f "$OUTPUT"
+
+          echo
+          echo "Output TIFF:"
+          ls -lh "$OUTPUT"
+
+          python - <<'PY'
+          import rasterio
+
+          path = "data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
+
+          with rasterio.open(path) as src:
+              print("CRS      :", src.crs)
+              print("Width    :", src.width)
+              print("Height   :", src.height)
+              print("Bounds   :", src.bounds)
+              print("NoData   :", src.nodata)
+              print("Transform:", src.transform)
+
+              assert src.crs.to_string() == "EPSG:4326"
+              assert src.count == 1
+              assert src.width > 0
+              assert src.height > 0
+
+          print("TIFF verification: OK")
+          PY
+
+      # ------------------------------------------------------
+      # Commit result
+      # ------------------------------------------------------
+
+      - name: Commit TIFF
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Build clipped GEOS-5 FWI TIFF for 2026-09-20"
+
+          git push origin HEAD:main
+
+      # ------------------------------------------------------
+      # Final verification
+      # ------------------------------------------------------
+
+      - name: Final verification
+        run: |
+          set -euo pipefail
+
+          echo
+          echo "=================================================="
+          echo "GEOS-5 FWI TIFF BUILD COMPLETED"
+          echo "=================================================="
+          echo
+
+          git status --short
+
+          ls -lh \
+            "data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif"
