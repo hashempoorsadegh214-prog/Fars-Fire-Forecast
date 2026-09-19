@@ -1,8 +1,9 @@
-
 #!/usr/bin/env python3
 
 from pathlib import Path
 import sys
+import os
+import json
 
 import numpy as np
 from netCDF4 import Dataset
@@ -16,15 +17,11 @@ import geopandas as gpd
 # SETTINGS
 # ============================================================
 
-NETCDF_FILE = Path(
-    "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026091700.20260920.nc"
-)
-
+info = json.loads(Path("data/raw/fwi/LATEST.json").read_text())
+NETCDF_FILE = Path(info["netcdf"])
 FARS_GEOJSON = Path("fars.geojson")
-
 OUTPUT_DIR = Path("data/processed/fwi")
-
-OUTPUT_FILE = OUTPUT_DIR / "FWI_GEOS5_Fars_2026-09-20.tif"
+OUTPUT_FILE = OUTPUT_DIR / f"FWI_GEOS5_Fars_{info['date']}.tif"
 
 VARIABLE_NAME = "GEOS-5_FWI"
 
@@ -461,3 +458,5 @@ with rasterio.open(OUTPUT_FILE) as src:
 
 print()
 print("Clipped GEOS-5 FWI GeoTIFF is ready.")
+
+Path("data/processed/fwi/LATEST.json").write_text(json.dumps({**info, "tif": OUTPUT_FILE.as_posix()}, indent=2)+"\n")
