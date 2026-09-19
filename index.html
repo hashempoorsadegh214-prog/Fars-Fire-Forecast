@@ -364,20 +364,63 @@
     });
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
-    // نقشه پایه Dark
-    // Dark basemap (no API key)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '&copy; Esri, DeLorme, NAVTEQ & NASA GEOS-5',
-      maxZoom: 16
-    }).addTo(map);
 
+    const esriDark = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {attribution:'&copy; Esri',maxZoom:16}).addTo(map);
+    const googleSatellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {attribution:'&copy; Google',maxZoom:20});
+    const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {attribution:'&copy; Google',maxZoom:20});
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap contributors',maxZoom:19});
+    const fwiOverlay = L.layerGroup().addTo(map);
+    function fwiAt(lat,lng) {
+      if (!tiffRaster || !tiffBbox || lng<tiffBbox[0] || lng>=tiffBbox[2] || lat<=tiffBbox[1] || lat>tiffBbox[3]) return null;
+      const x=Math.floor((lng-tiffBbox[0])/(tiffBbox[2]-tiffBbox[0])*tiffWidth);
+      const y=Math.floor((tiffBbox[3]-lat)/(tiffBbox[3]-tiffBbox[1])*tiffHeight);
+      const v=tiffRaster[y*tiffWidth+x];
+      return Number.isFinite(v) && v>=0 && v!==tiffNoData ? v : null;
+    }
+    function escapeHtml(v) { const el=document.createElement('span'); el.textContent=String(v); return el.innerHTML; }
+    function descriptionFields(html) {
+      const doc=new DOMParser().parseFromString(html || '', 'text/html'), out={};
+      doc.querySelectorAll('tr').forEach(row=>{const cells=row.querySelectorAll(':scope > td'); if(cells.length===2) out[cells[0].textContent.trim()]=cells[1].textContent.trim();});
+      return out;
+    }
+    function vectorLayer(url,style,bright,defaultType) {
+      const group=L.geoJSON(null,{style:()=>style,onEachFeature:(feature,layer)=>{
+        layer.on('mouseover',()=>{layer.setStyle({color:bright,weight:4,opacity:1});});
+        layer.on('mouseout',()=>group.resetStyle(layer));
+        layer.on('click',e=>{
+          const p=feature.properties || {}, d=descriptionFields(p.description);
+          const name=p.Name || p.name || p.NAME1 || d.NAME1 || (defaultType==='استان'?'فارس':'بدون نام');
+          const type=p.tafkik_nam || p.type || d.tafkik_nam || defaultType;
+          const v=fwiAt(e.latlng.lat,e.latlng.lng);
+          const color=v===null?'#64748b':`rgb(${getFwiColor(v).slice(0,3).join(',')})`;
+          const risk=v===null?'داده‌ای موجود نیست':getRiskLabel(v);
+          const html=`<div dir="rtl" style="font-family:Tahoma;line-height:1.9"><b>نام منطقه: ${escapeHtml(name)}</b><br>نوع منطقه: ${escapeHtml(type)}<br>FWI: ${v===null?'—':v.toFixed(1)}<br>طبقه خطر: <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:${color};color:${v!==null && v>=10 && v<30?'#111':'white'}">${escapeHtml(risk)}</span><br><small dir="ltr">${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}</small></div>`;
+          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+        });
+      }}).addTo(map);
+      fetch(url).then(r=>{if(!r.ok) throw new Error(url+': '+r.status);return r.json();}).then(g=>group.addData(g)).catch(err=>{
+        console.warn(err);
+        const notice=document.createElement('div');notice.textContent='بارگذاری نشد: '+url;notice.style.color='#f59e0b';document.querySelector('aside').appendChild(notice);
+      });
+      return group;
+    }
+    const farsBorderLayer=vectorLayer('fars.geojson',{color:'#38bdf8',weight:2,fillOpacity:0},'#bae6fd','استان');
+    const protectedAreasLayer=vectorLayer('protected_areas.geojson',{color:'#10b981',fillColor:'#10b981',weight:2,fillOpacity:0.2},'#6ee7b7','مناطق چهارگانه محیط‌زیست');
+    const huntingBannedLayer=vectorLayer('hunting_banned.geojson',{color:'#f59e0b',fillColor:'#f59e0b',weight:2,fillOpacity:0.2},'#fde68a','منطقه شکار ممنوع');
+    L.control.layers({'Esri Dark Canvas':esriDark,'Google Satellite (ماهواره گوگل)':googleSatellite,'Google Hybrid':googleHybrid,'OpenStreetMap':osm},{
+      'FWI Raster (پیش‌بینی خطر حریق)':fwiOverlay,
+      'مرز استان فارس':farsBorderLayer,
+      'مناطق چهارگانه محیط‌زیست':protectedAreasLayer,
+      'مناطق شکار ممنوع':huntingBannedLayer
+    },{position:'topright',collapsed:false}).addTo(map);
+    let tiffNoData=null;
     let tiffRaster = null;
     let tiffBbox = null;
     let tiffWidth = 0;
     let tiffHeight = 0;
 
     function getFwiColor(val) {
-      if (val === null || isNaN(val) || val < 0) return [0, 0, 0, 0];
+      if (val === null || !Number.isFinite(val) || val === tiffNoData || val < 0) return [0, 0, 0, 0];
       if (val < 10) return [46, 125, 50, 180];     // سبز
       if (val < 20) return [249, 216, 53, 190];   // زرد
       if (val < 30) return [251, 140, 0, 200];    // نارنجی
@@ -386,7 +429,7 @@
     }
 
     function getRiskLabel(val) {
-      if (val === null || isNaN(val) || val < 0) return 'خارج از محدوده';
+      if (val === null || !Number.isFinite(val) || val === tiffNoData || val < 0) return 'خارج از محدوده';
       if (val < 10) return 'خطر کم (Low)';
       if (val < 20) return 'خطر متوسط (Moderate)';
       if (val < 30) return 'خطر زیاد (High)';
@@ -418,6 +461,7 @@
         const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
         const image = await tiff.getImage();
 
+        tiffNoData = image.getGDALNoData() === null ? null : Number(image.getGDALNoData());
         tiffWidth = image.getWidth();
         tiffHeight = image.getHeight();
         const rasters = await image.readRasters();
@@ -451,7 +495,7 @@
           imgData.data[idx + 2] = color[2];
           imgData.data[idx + 3] = color[3];
 
-          if (val > 0 && val < 200) {
+          if (Number.isFinite(val) && val >= 0 && val !== tiffNoData) {
             if (val > maxVal) maxVal = val;
             sum += val;
             validCount++;
@@ -462,7 +506,7 @@
         ctx.putImageData(imgData, 0, 0);
 
         // افزودن لایه به نقشه
-        L.imageOverlay(canvas.toDataURL(), bounds, { opacity: 0.85 }).addTo(map);
+        L.imageOverlay(canvas.toDataURL(), bounds, { opacity: 0.85 }).addTo(fwiOverlay);
         map.fitBounds(bounds);
 
         // بروزرسانی آمار بالا
@@ -488,24 +532,9 @@
       const lng = e.latlng.lng;
       document.getElementById('coordVal').innerText = `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
 
-      if (!tiffRaster || !tiffBbox) return;
-
-      if (lng >= tiffBbox[0] && lng <= tiffBbox[2] && lat >= tiffBbox[1] && lat <= tiffBbox[3]) {
-        const xPct = (lng - tiffBbox[0]) / (tiffBbox[2] - tiffBbox[0]);
-        const yPct = (tiffBbox[3] - lat) / (tiffBbox[3] - tiffBbox[1]);
-
-        const px = Math.floor(xPct * tiffWidth);
-        const py = Math.floor(yPct * tiffHeight);
-        const val = tiffRaster[py * tiffWidth + px];
-
-        if (val !== undefined && val > 0 && val < 200) {
-          document.getElementById('hoverFwiVal').innerText = `FWI: ${val.toFixed(1)}`;
-          document.getElementById('hoverRiskLevel').innerText = getRiskLabel(val);
-          return;
-        }
-      }
-      document.getElementById('hoverFwiVal').innerText = '--';
-      document.getElementById('hoverRiskLevel').innerText = 'خارج از محدوده آتش';
+      const val=fwiAt(lat,lng);
+      document.getElementById('hoverFwiVal').innerText=val===null?'--':`FWI: ${val.toFixed(1)}`;
+      document.getElementById('hoverRiskLevel').innerText=val===null?'داده‌ای موجود نیست':getRiskLabel(val);
     });
 
     loadFwiLayer();
