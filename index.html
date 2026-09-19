@@ -537,11 +537,15 @@
       const loader = document.getElementById('loader');
       try {
         statusBox.innerText = 'در حال دریافت فایل رستر...';
-        const candidateUrls = [
-          'data/processed/fwi/FWI_GEOS5_Fars_2026-09-20.tif',
-          'data/clipped/FWI_20260920_fars.tif',
-          'data/processed/fwi/FWI_GEOS5_Fars_latest.tif'
-        ];
+        const metaResponse = await fetch('data/processed/fwi/LATEST.json', {cache:'no-store'});
+        if (!metaResponse.ok) throw new Error('اطلاعات پیش‌بینی منتشر نشده است.');
+        const meta = await metaResponse.json();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(meta.date) || !/^\d{10}$/.test(meta.forecast_run)) throw new Error('Invalid forecast metadata');
+        let dateBox = document.getElementById('forecastDate');
+        if (!dateBox) { dateBox=document.createElement('div'); dateBox.id='forecastDate'; statusBox.after(dateBox); }
+        const today = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+        dateBox.textContent = 'تاریخ پیش‌بینی: ' + meta.date + ' | اجرای مدل: ' + meta.forecast_run + (meta.date < today ? ' | هشدار: داده قدیمی است' : '');
+        const candidateUrls = ['data/processed/fwi/FWI_GEOS5_Fars_' + meta.date + '.tif?run=' + meta.forecast_run];
         let response = null;
         let matchedUrl = '';
         for (const url of candidateUrls) {
