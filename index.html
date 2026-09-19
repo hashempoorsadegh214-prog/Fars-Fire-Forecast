@@ -273,7 +273,7 @@
   <header>
     <div class="header-title">
       <h1>سامانه هشدار زودهنگام حریق در استان فارس</h1>
-      <span>(FWI)</span>
+      <span>بر اساس محاسبه شاخص(FWI)</span>
     </div>
 
     <div class="kpi-container">
@@ -425,12 +425,12 @@
       return group;
     }
     const farsBorderLayer=vectorLayer('fars.geojson',{color:'red',weight:2,fillOpacity:0},'red','استان');
-    const protectedAreasLayer=vectorLayer('protected_areas.geojson',{color:'#10b981',fillColor:'#10b981',weight:2,fillOpacity:0.2},'#6ee7b7','مناطق چهارگانه محیط‌زیست');
+    const protectedAreasLayer=vectorLayer('protected_areas.geojson',{color:'#10b981',fillColor:'#10b981',weight:2,fillOpacity:0.2},'#6ee7b7','مناطق چهارگانه محیط‌ زیست');
     const huntingBannedLayer=vectorLayer('hunting_banned.geojson',{color:'#f59e0b',fillColor:'#f59e0b',weight:2,fillOpacity:0.2},'#fde68a','منطقه شکار ممنوع');
-    L.control.layers({'OpenStreetMap':osm},{
+    L.control.layers({'OpenStreetMap':osm,'Google Hybrid':googleHybrid},{
       'FWI Raster (پیش‌بینی خطر حریق)':fwiOverlay,
       'مرز استان فارس':farsBorderLayer,
-      'مناطق چهارگانه محیط‌زیست':protectedAreasLayer,
+      'مناطق چهارگانه محیط‌ زیست':protectedAreasLayer,
       'مناطق شکار ممنوع':huntingBannedLayer
     },{position:'topright',collapsed:false}).addTo(map);
     let tiffNoData=null;
