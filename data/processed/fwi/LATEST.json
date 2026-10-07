@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-07",
-  "netcdf": "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026100400.20261007.nc",
+  "date": "2026-10-08",
+  "netcdf": "data/raw/fwi/FWI.GEOS-5.Daily.Default.2026100400.20261008.nc",
   "forecast_run": "2026100400",
-  "source_url": "https://portal.nccs.nasa.gov/datashare/GlobalFWI/v2.0/fwiCalcs.GEOS-5/Default/GEOS-5/2026/2026100400/FWI.GEOS-5.Daily.Default.2026100400.20261007.nc",
-  "tif": "data/processed/fwi/FWI_GEOS5_Fars_2026-10-07.tif"
+  "source_url": "https://portal.nccs.nasa.gov/datashare/GlobalFWI/v2.0/fwiCalcs.GEOS-5/Default/GEOS-5/2026/2026100400/FWI.GEOS-5.Daily.Default.2026100400.20261008.nc",
+  "tif": "data/processed/fwi/FWI_GEOS5_Fars_2026-10-08.tif"
 }
